@@ -299,31 +299,38 @@ end)
 -- Apply ESP to all enemies at the start
 applyESPToEnemies()
 
--- Display health of enemies
 RunService.RenderStepped:Connect(function()
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
             local healthTag = player.Character.Head:FindFirstChild("HealthTag")
             if not healthTag then
                 healthTag = Instance.new("BillboardGui")
                 healthTag.Name = "HealthTag"
-                healthTag.Size = UDim2.new(0, 50, 0, 25)
-                healthTag.StudsOffset = Vector3.new(0, 2.5, 0)
+                healthTag.Size = UDim2.new(2, 0, 0.2, 0)
+                healthTag.StudsOffset = Vector3.new(0, 2, 0)
                 healthTag.Adornee = player.Character.Head
                 healthTag.Parent = player.Character.Head
                 healthTag.AlwaysOnTop = true
                 healthTag.MaxDistance = 10000
 
-                local textLabel = Instance.new("TextLabel", healthTag)
-                textLabel.Size = UDim2.new(1, 0, 1, 0)
-                textLabel.BackgroundTransparency = 1
-                textLabel.TextScaled = true
-                textLabel.TextColor3 = Color3.new(1, 0, 0)
-                textLabel.Font = Enum.Font.SourceSansBold
-                textLabel.Text = tostring(math.floor(player.Character.Humanoid.Health))
-            else
-                healthTag:FindFirstChild("TextLabel").Text = tostring(math.floor(player.Character.Humanoid.Health))
+                local background = Instance.new("Frame", healthTag)
+                background.Size = UDim2.new(1, 0, 1, 0)
+                background.BackgroundColor3 = Color3.new(0, 0, 0)
+                background.BorderSizePixel = 0
+
+                local healthBar = Instance.new("Frame", background)
+                healthBar.Name = "HealthBar"
+                healthBar.Size = UDim2.new(1, 0, 1, 0)
+                healthBar.BackgroundColor3 = Color3.new(0, 1, 0)
+                healthBar.BorderSizePixel = 0
             end
+
+            local humanoid = player.Character.Humanoid
+            local healthBar = healthTag:FindFirstChild("Frame"):FindFirstChild("HealthBar")
+            local healthPercentage = humanoid.Health / humanoid.MaxHealth
+            
+            healthBar.Size = UDim2.new(healthPercentage, 0, 1, 0)
+            healthBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - healthPercentage), 255 * healthPercentage, 0) 
         end
     end
 end)
