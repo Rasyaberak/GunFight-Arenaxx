@@ -24,13 +24,22 @@ ShootEvent.Parent = ReplicatedStorage
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
 
+-- Function to check if the player is an enemy
+local function IsEnemy(player)
+    -- Example: Check if the enemy is on a different team
+    if player.Team ~= LocalPlayer.Team then
+        return true
+    end
+    return false
+end
+
 -- Function to get the closest enemy
 local function GetNearestEnemy()
     local closestEnemy = nil
     local shortestDistance = math.huge
 
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        if player ~= LocalPlayer and IsEnemy(player) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local char = player.Character
             local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
             if head then
@@ -228,9 +237,6 @@ end
 
 UserInputService.InputBegan:Connect(onInputBegan)
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-
 local ShootEvent = Instance.new("RemoteEvent")
 ShootEvent.Name = "ShootEvent"
 ShootEvent.Parent = ReplicatedStorage
@@ -364,7 +370,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Aimbot function
+-- Aimbot function (only targets enemies)
 RunService.RenderStepped:Connect(function()
     if AimbotEnabled then
         local target = GetNearestEnemy()
