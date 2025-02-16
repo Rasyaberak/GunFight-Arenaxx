@@ -1,15 +1,15 @@
-local players = game:GetService("Players")
-local runService = game:GetService("RunService")
-local userInputService = game:GetService("UserInputService")
-local localPlayer = players.LocalPlayer
-local camera = game:GetService("Workspace").CurrentCamera
-local lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = game:GetService("Workspace").CurrentCamera
+local Lighting = game:GetService("Lighting")
 
--- Optimize lighting for FPS boost
-lighting.GlobalShadows = false
-lighting.FogEnd = 100000
-lighting.Brightness = 2
-lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+-- Optimize Lighting for FPS boost
+Lighting.GlobalShadows = false
+Lighting.FogEnd = 100000
+Lighting.Brightness = 2
+Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
 
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
@@ -28,6 +28,14 @@ local function detectAndAssignBot(player)
     end
 end
 
+-- Function to check if a player is an enemy
+local function IsEnemy(player)
+    if player.Team ~= LocalPlayer.Team then  -- Change this if using custom team logic
+        return true
+    end
+    return false
+end
+
 -- Function to create ESP on enemies
 local function createESP(player)
     if not player or not player.Team then return end
@@ -44,9 +52,9 @@ local function createESP(player)
                 highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             end
 
-            if player.Team ~= localPlayer.Team then
+            if player.Team ~= LocalPlayer.Team then
                 local hue = 0
-                runService.RenderStepped:Connect(function()
+                RunService.RenderStepped:Connect(function()
                     if player and player.Character and highlight then
                         hue = (hue + 10) % 360
                         highlight.FillColor = Color3.fromHSV(hue / 360, 1, 1)
@@ -72,10 +80,10 @@ local function getClosestEnemy()
     local closestEnemy = nil
     local shortestDistance = math.huge
 
-    for _, player in pairs(players:GetPlayers()) do
-        if player ~= localPlayer and player.Team ~= localPlayer.Team and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local enemyPosition = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            local distance = (Vector2.new(enemyPosition.X, enemyPosition.Y) - userInputService:GetMouseLocation()).Magnitude
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local enemyPosition = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            local distance = (Vector2.new(enemyPosition.X, enemyPosition.Y) - UserInputService:GetMouseLocation()).Magnitude
 
             if distance < shortestDistance then
                 shortestDistance = distance
@@ -91,7 +99,7 @@ local function aimAtTarget()
     local target = getClosestEnemy()
     if target and target.Character and target.Character:FindFirstChild("Head") then
         local aimPosition = target.Character.Head.Position
-        local direction = (aimPosition - camera.CFrame.Position).unit
+        local direction = (aimPosition - Camera.CFrame.Position).unit
 
         -- Simulate recoil spread
         spreadFactor = math.min(spreadFactor + 0.02, 0.1)
@@ -103,8 +111,8 @@ local function aimAtTarget()
             (math.random() - 0.5) * spreadFactor
         )
 
-        -- Adjust camera aim
-        camera.CFrame = CFrame.new(camera.CFrame.Position, camera.CFrame.Position + direction)
+        -- Adjust Camera aim
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + direction)
         print("Aiming at: " .. botNames[target] or target.Name .. " with spread: " .. spreadFactor)
 
         -- Reset spread gradually
@@ -123,7 +131,16 @@ local function onInputBegan(input, gameProcessed)
     end
 end
 
-userInputService.InputBegan:Connect(onInputBegan)
+-- Function to create ESP Line
+local function CreateESPLine()
+    local Line = Drawing.new("Line")
+    Line.Thickness = 2
+    Line.Color = Color3.fromRGB(255, 0, 0) -- Red for enemies
+    Line.Transparency = 1
+    return Line
+end
+
+UserInputService.InputBegan:Connect(onInputBegan)
 
 -- Function to manage player additions
 local function onPlayerAdded(player)
@@ -142,15 +159,18 @@ local function onPlayerAdded(player)
     createESP(player)
 end
 
--- Apply to all current players
-for _, player in pairs(players:GetPlayers()) do
-    if player ~= localPlayer then
+-- Apply to all current Players
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
         onPlayerAdded(player)
     end
 end
 
-players.PlayerAdded:Connect(onPlayerAdded)
-players.PlayerRemoving:Connect(function(player)
+-- Store lines for each enemy
+local ESP_Lines = {}
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(function(player)
     print("Player removed: " .. player.Name)
     botNames[player] = nil -- Remove bot name entry
     if player.Character then
@@ -162,9 +182,9 @@ players.PlayerRemoving:Connect(function(player)
 end)
 
 -- Display health of enemies
-runService.RenderStepped:Connect(function()
-    for _, player in pairs(players:GetPlayers()) do
-        if player ~= localPlayer and player.Team ~= localPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+RunService.RenderStepped:Connect(function()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
             local healthTag = player.Character.Head:FindFirstChild("HealthTag")
             if not healthTag then
                 healthTag = Instance.new("BillboardGui")
@@ -190,11 +210,50 @@ runService.RenderStepped:Connect(function()
     end
 end)
 
+RunService.RenderStepped:Connect(function()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and IsEnemy(player) then
+            local Character = player.Character
+            local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+
+            if HumanoidRootPart then
+                -- Get screen positions
+                local ScreenPosition, OnScreen = workspace.CurrentCamera:WorldToViewportPoint(HumanoidRootPart.Position)
+                local MyScreenPos, MyOnScreen = workspace.CurrentCamera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position)
+
+                -- Create or update ESP line
+                if not ESP_Lines[player] then
+                    ESP_Lines[player] = CreateESPLine()
+                end
+
+                local Line = ESP_Lines[player]
+                if OnScreen and MyOnScreen then
+                    Line.Visible = true
+                    Line.From = Vector2.new(MyScreenPos.X, MyScreenPos.Y)
+                    Line.To = Vector2.new(ScreenPosition.X, ScreenPosition.Y)
+                else
+                    Line.Visible = false
+                end
+            end
+        elseif ESP_Lines[player] then
+            ESP_Lines[player].Visible = false
+        end
+    end
+end)
+
+-- Cleanup on player removal
+Players.PlayerRemoving:Connect(function(player)
+    if ESP_Lines[player] then
+        ESP_Lines[player]:Remove()
+        ESP_Lines[player] = nil
+    end
+end)
+
 -- Add tool glow effect
 while true do
     task.wait(0.1)
-    if localPlayer.Character and localPlayer.Character:FindFirstChild("Tool") then
-        local tool = localPlayer.Character:FindFirstChild("Tool")
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Tool") then
+        local tool = LocalPlayer.Character:FindFirstChild("Tool")
         local highlight = tool:FindFirstChild("Highlight")
         if not highlight then
             highlight = Instance.new("Highlight")
