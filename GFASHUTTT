@@ -28,30 +28,6 @@ local function detectAndAssignBot(player)
     end
 end
 
--- Add a line above enemy players (for enemy team only)
-local function createLineAbove(player)
-    if player and player.Character and player.Character:FindFirstChild("Head") then
-        -- Only create if not already present
-        if not player.Character.Head:FindFirstChild("LineAbove") then
-            local lineGui = Instance.new("BillboardGui")
-            lineGui.Name = "LineAbove"
-            lineGui.Size = UDim2.new(0, 100, 0, 5)  -- 100 pixels wide and 5 pixels tall
-            lineGui.StudsOffset = Vector3.new(0, 3, 0)  -- positions the line above the head; adjust as needed
-            lineGui.Adornee = player.Character.Head
-            lineGui.Parent = player.Character.Head
-            lineGui.AlwaysOnTop = true
-            lineGui.MaxDistance = 10000
-
-            local lineFrame = Instance.new("Frame")
-            lineFrame.Size = UDim2.new(1, 0, 1, 0)
-            lineFrame.BackgroundColor3 = Color3.new(1, 1, 1)  -- white line; change color if desired
-            lineFrame.BackgroundTransparency = 0
-            lineFrame.BorderSizePixel = 0
-            lineFrame.Parent = lineGui
-        end
-    end
-end
-
 -- Function to create ESP on enemies
 local function createESP(player)
     if not player or not player.Team then return end
@@ -181,15 +157,6 @@ players.PlayerRemoving:Connect(function(player)
         local highlight = player.Character:FindFirstChild("Highlight")
         if highlight then
             highlight:Destroy()
-        end
-    end
-end)
-
--- Check and create the line for all enemy players every frame
-runService.RenderStepped:Connect(function()
-    for _, player in pairs(players:GetPlayers()) do
-        if player ~= localPlayer and player.Team ~= localPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
-            createLineAbove(player)
         end
     end
 end)
