@@ -5,15 +5,12 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = game:GetService("Workspace").CurrentCamera
 local Lighting = game:GetService("Lighting")
-local Mouse = LocalPlayer:GetMouse()
 
 -- Optimize Lighting for FPS boost
 Lighting.GlobalShadows = false
 Lighting.FogEnd = 100000
 Lighting.Brightness = 2
 Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
-
-local tool = script.Parent
 
 local ShootEvent = Instance.new("RemoteEvent")
 ShootEvent.Name = "ShootEvent"
@@ -261,33 +258,6 @@ local function onPlayerAdded(player)
 
     createESP(player)
 end
-
-local function getAimSpread()
-    local spreadAmount = 0.1 -- Adjust for more/less spread
-    return Vector3.new(math.random(-spreadAmount, spreadAmount), math.random(-spreadAmount, spreadAmount), 0)
-end
-
-local function onShoot()
-    if not player.Character then return end
-    local character = player.Character
-    local head = character:FindFirstChild("Head")
-    if not head then return end
-    
-    local target = mouse.Target
-    if target and target.Parent and target.Parent:FindFirstChild("Head") then
-        local enemyHead = target.Parent.Head
-        
-        local aimDirection = (enemyHead.Position - character.Head.Position).unit + getAimSpread()
-        local ray = Ray.new(character.Head.Position, aimDirection * 800)
-        
-        local hit, position = workspace:FindPartOnRay(ray, character)
-        if hit then
-            hit.Parent:FindFirstChildOfClass("Humanoid"):TakeDamage(100) -- Instant headshot kill
-        end
-    end
-end
-
-tool.Activated:Connect(onShoot)
 
 -- Apply to all current Players
 for _, player in pairs(Players:GetPlayers()) do
