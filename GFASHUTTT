@@ -13,9 +13,7 @@ Lighting.FogEnd = 100000
 Lighting.Brightness = 2
 Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
 
-local AimbotEnabled = true -- Aimbot always on
-local AimSmoothness = 0.2 -- Smoother aim transition
-local SpreadAmount = 1.5 -- Higher = more spread
+local tool = script.Parent
 
 local ShootEvent = Instance.new("RemoteEvent")
 ShootEvent.Name = "ShootEvent"
@@ -23,39 +21,6 @@ ShootEvent.Parent = ReplicatedStorage
 
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
-
--- Function to check if the player is an enemy
-local function IsEnemy(player)
-    -- Example: Check if the enemy is on a different team
-    if player.Team ~= LocalPlayer.Team then
-        return true
-    end
-    return false
-end
-
--- Function to get the closest enemy
-local function GetNearestEnemy()
-    local closestEnemy = nil
-    local shortestDistance = math.huge
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and IsEnemy(player) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local char = player.Character
-            local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            if head then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                if onScreen then
-                    local distance = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
-                        closestEnemy = head
-                    end
-                end
-            end
-        end
-    end
-    return closestEnemy
-end
 
 -- Function to detect bots and assign names
 local function detectAndAssignBot(player)
@@ -237,6 +202,9 @@ end
 
 UserInputService.InputBegan:Connect(onInputBegan)
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
 local ShootEvent = Instance.new("RemoteEvent")
 ShootEvent.Name = "ShootEvent"
 ShootEvent.Parent = ReplicatedStorage
@@ -293,6 +261,33 @@ local function onPlayerAdded(player)
 
     createESP(player)
 end
+
+local function getAimSpread()
+    local spreadAmount = 0.1 -- Adjust for more/less spread
+    return Vector3.new(math.random(-spreadAmount, spreadAmount), math.random(-spreadAmount, spreadAmount), 0)
+end
+
+local function onShoot()
+    if not player.Character then return end
+    local character = player.Character
+    local head = character:FindFirstChild("Head")
+    if not head then return end
+    
+    local target = mouse.Target
+    if target and target.Parent and target.Parent:FindFirstChild("Head") then
+        local enemyHead = target.Parent.Head
+        
+        local aimDirection = (enemyHead.Position - character.Head.Position).unit + getAimSpread()
+        local ray = Ray.new(character.Head.Position, aimDirection * 800)
+        
+        local hit, position = workspace:FindPartOnRay(ray, character)
+        if hit then
+            hit.Parent:FindFirstChildOfClass("Humanoid"):TakeDamage(100) -- Instant headshot kill
+        end
+    end
+end
+
+tool.Activated:Connect(onShoot)
 
 -- Apply to all current Players
 for _, player in pairs(Players:GetPlayers()) do
@@ -366,44 +361,6 @@ RunService.RenderStepped:Connect(function()
             
             healthBar.Size = UDim2.new(healthPercentage, 0, 1, 0)
             healthBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - healthPercentage), 255 * healthPercentage, 0) 
-        end
-    end
-end)
-
--- Aimbot function (only targets enemies)
-RunService.RenderStepped:Connect(function()
-    if AimbotEnabled then
-        local target = GetNearestEnemy()
-        if target then
-            -- Smooth Aim (Interpolates between current aim and target)
-            local targetPos = target.Position
-            local smoothPos = Camera.CFrame.Position:Lerp(targetPos, AimSmoothness)
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, smoothPos)
-        end
-    end
-end)
-
--- Bullet Spread
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local target = GetNearestEnemy()
-        if target then
-            -- Create random spread
-            local spread = Vector3.new(
-                math.random(-SpreadAmount, SpreadAmount) / 10,
-                math.random(-SpreadAmount, SpreadAmount) / 10,
-                math.random(-SpreadAmount, SpreadAmount) / 10
-            )
-            local shootDirection = (target.Position - Camera.CFrame.Position).unit + spread
-
-            -- Raycast to detect hits
-            local ray = Ray.new(Camera.CFrame.Position, shootDirection * 500)
-            local hit, position = workspace:FindPartOnRay(ray, LocalPlayer.Character)
-
-            if hit and hit.Parent:FindFirstChild("Humanoid") then
-                hit.Parent.Humanoid:TakeDamage(20) -- Deal 20 damage on hit
-            end
         end
     end
 end)
