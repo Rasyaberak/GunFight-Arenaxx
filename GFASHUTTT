@@ -241,49 +241,39 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ESP Loop
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("Humanoid") then
-            local humanoid = character.Humanoid
-            if humanoid.MoveDirection.Magnitude > 0 then
-                -- If player is moving, hide all lines
-                for _, line in pairs(ESP_Lines) do
-                    line.Visible = false
+RunService.RenderStepped:Connect(function()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and IsEnemy(player) then
+            local Character = player.Character
+            local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+            local MyCharacter = LocalPlayer.Character
+            local MyHumanoidRootPart = MyCharacter and MyCharacter:FindFirstChild("HumanoidRootPart")
+
+            if HumanoidRootPart and MyHumanoidRootPart then
+                local EnemyPosition, OnScreenEnemy = workspace.CurrentCamera:WorldToViewportPoint(HumanoidRootPart.Position)
+                local MyPosition, OnScreenMe = workspace.CurrentCamera:WorldToViewportPoint(MyHumanoidRootPart.Position)
+
+                -- Create line if not exists
+                if not ESP_Lines[player] then
+                    ESP_Lines[player] = CreateESPLine()
                 end
-                continue
-            end
-        end
 
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and IsEnemy(player) then
-                local Character = player.Character
-                local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
-
-                if HumanoidRootPart then
-                    -- Adjust position to be above the enemy
-                    local AbovePosition = HumanoidRootPart.Position + Vector3.new(0, 3, 0) 
-                    local ScreenPosition, OnScreen = workspace.CurrentCamera:WorldToViewportPoint(AbovePosition)
-                    local MyScreenPos, MyOnScreen = workspace.CurrentCamera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
-
-                    if not ESP_Lines[player] then
-                        ESP_Lines[player] = CreateESPLine()
-                    end
-
-                    local Line = ESP_Lines[player]
-                    if OnScreen and MyOnScreen then
+                local Line = ESP_Lines[player]
+                if OnScreenEnemy and OnScreenMe then
+                    -- Ensure the line does not point downward unnaturally
+                    if EnemyPosition.Y < MyPosition.Y then
                         Line.Visible = true
-                        Line.From = Vector2.new(MyScreenPos.X, MyScreenPos.Y)
-                        Line.To = Vector2.new(ScreenPosition.X, ScreenPosition.Y)
+                        Line.From = Vector2.new(MyPosition.X, MyPosition.Y)
+                        Line.To = Vector2.new(EnemyPosition.X, EnemyPosition.Y)
                     else
                         Line.Visible = false
                     end
+                else
+                    Line.Visible = false
                 end
-            elseif ESP_Lines[player] then
-                ESP_Lines[player].Visible = false
             end
+        elseif ESP_Lines[player] then
+            ESP_Lines[player].Visible = false
         end
     end
 end)
