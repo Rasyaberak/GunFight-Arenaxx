@@ -199,6 +199,49 @@ end
 
 UserInputService.InputBegan:Connect(onInputBegan)
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local ShootEvent = Instance.new("RemoteEvent")
+ShootEvent.Name = "ShootEvent"
+ShootEvent.Parent = ReplicatedStorage
+
+local function findClosestEnemy(shooter)
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= shooter and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local distance = (shooter.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestEnemy = player.Character
+            end
+        end
+    end
+    
+    return closestEnemy
+end
+
+local function shootAtTarget(player, target)
+    if target and target:FindFirstChild("HumanoidRootPart") then
+        local targetPosition = target.HumanoidRootPart.Position
+        for i = 1, 3 do -- Shoots multiple bullets per trigger
+            local spread = Vector3.new(math.random(-2, 2) * 0.2, math.random(-2, 2) * 0.2, 0)
+            local aimDirection = (targetPosition - player.Character.HumanoidRootPart.Position).Unit + spread
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {player.Character}
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+            
+            local rayResult = workspace:Raycast(player.Character.HumanoidRootPart.Position, aimDirection * 1000, raycastParams)
+            
+            if rayResult and rayResult.Instance and rayResult.Instance.Parent == target then
+                target.Humanoid:TakeDamage(100) -- OP aimbot, high damage
+            end
+        end
+    end
+end
+
 -- Function to manage player additions
 local function onPlayerAdded(player)
     print("Player added: " .. player.Name)
@@ -287,17 +330,8 @@ end)
 
 ShootEvent.OnServerEvent:Connect(function(player, origin, direction)
     local target = findClosestEnemy(player)
-    if target and target:FindFirstChild("HumanoidRootPart") then
-        local targetPosition = target.HumanoidRootPart.Position
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterDescendantsInstances = {player.Character}
-        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        
-        local rayResult = workspace:Raycast(origin, (targetPosition - origin).Unit * 1000, raycastParams)
-        
-        if rayResult and rayResult.Instance and rayResult.Instance.Parent == target then
-            target.Humanoid:TakeDamage(50) -- High damage for OP aimbot
-        end
+    if target then
+        shootAtTarget(player, target)
     end
 end)
 
