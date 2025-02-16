@@ -1,0 +1,244 @@
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local userInputService = game:GetService("UserInputService")
+local localPlayer = players.LocalPlayer
+local camera = game:GetService("Workspace").CurrentCamera
+local lighting = game:GetService("Lighting")
+
+-- Optimize lighting for FPS boost
+lighting.GlobalShadows = false
+lighting.FogEnd = 100000
+lighting.Brightness = 2
+lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+
+local spreadFactor = 0 -- Recoil spread factor
+local botNames = {} -- Store bot names
+
+-- Function to detect bots and assign names
+local function detectAndAssignBot(player)
+    if not player then return end
+
+    if not botNames[player] then
+        botNames[player] = player.Name -- Default to player name
+    end
+
+    if string.find(player.Name, "Bot") or string.find(player.Name, "AI") then
+        botNames[player] = "AI-" .. tostring(math.random(1000, 9999))
+        print("Detected bot: " .. botNames[player])
+    end
+end
+
+-- Add a line above enemy players (for enemy team only)
+local function createLineAbove(player)
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        -- Only create if not already present
+        if not player.Character.Head:FindFirstChild("LineAbove") then
+            local lineGui = Instance.new("BillboardGui")
+            lineGui.Name = "LineAbove"
+            lineGui.Size = UDim2.new(0, 100, 0, 5)  -- 100 pixels wide and 5 pixels tall
+            lineGui.StudsOffset = Vector3.new(0, 3, 0)  -- positions the line above the head; adjust as needed
+            lineGui.Adornee = player.Character.Head
+            lineGui.Parent = player.Character.Head
+            lineGui.AlwaysOnTop = true
+            lineGui.MaxDistance = 10000
+
+            local lineFrame = Instance.new("Frame")
+            lineFrame.Size = UDim2.new(1, 0, 1, 0)
+            lineFrame.BackgroundColor3 = Color3.new(1, 1, 1)  -- white line; change color if desired
+            lineFrame.BackgroundTransparency = 0
+            lineFrame.BorderSizePixel = 0
+            lineFrame.Parent = lineGui
+        end
+    end
+end
+
+-- Function to create ESP on enemies
+local function createESP(player)
+    if not player or not player.Team then return end
+
+    local function applyHighlight()
+        if player.Character then
+            local highlight = player.Character:FindFirstChild("Highlight")
+            if not highlight then
+                highlight = Instance.new("Highlight")
+                highlight.Parent = player.Character
+                highlight.Adornee = player.Character
+                highlight.FillTransparency = 0.1
+                highlight.OutlineTransparency = 0
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            end
+
+            if player.Team ~= localPlayer.Team then
+                local hue = 0
+                runService.RenderStepped:Connect(function()
+                    if player and player.Character and highlight then
+                        hue = (hue + 10) % 360
+                        highlight.FillColor = Color3.fromHSV(hue / 360, 1, 1)
+                        highlight.OutlineColor = Color3.fromHSV(hue / 360, 1, 1)
+                    end
+                end)
+            else
+                highlight.FillColor = Color3.new(1, 1, 1)
+                highlight.OutlineColor = Color3.new(1, 1, 1)
+            end
+        end
+    end
+
+    applyHighlight()
+    player.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        applyHighlight()
+    end)
+end
+
+-- Function to find the closest enemy
+local function getClosestEnemy()
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Team ~= localPlayer.Team and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local enemyPosition = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            local distance = (Vector2.new(enemyPosition.X, enemyPosition.Y) - userInputService:GetMouseLocation()).Magnitude
+
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestEnemy = player
+            end
+        end
+    end
+    return closestEnemy
+end
+
+-- Function to aim at the target with recoil spread
+local function aimAtTarget()
+    local target = getClosestEnemy()
+    if target and target.Character and target.Character:FindFirstChild("Head") then
+        local aimPosition = target.Character.Head.Position
+        local direction = (aimPosition - camera.CFrame.Position).unit
+
+        -- Simulate recoil spread
+        spreadFactor = math.min(spreadFactor + 0.02, 0.1)
+
+        -- Apply spread
+        direction = direction + Vector3.new(
+            (math.random() - 0.5) * spreadFactor,
+            (math.random() - 0.5) * spreadFactor,
+            (math.random() - 0.5) * spreadFactor
+        )
+
+        -- Adjust camera aim
+        camera.CFrame = CFrame.new(camera.CFrame.Position, camera.CFrame.Position + direction)
+        print("Aiming at: " .. botNames[target] or target.Name .. " with spread: " .. spreadFactor)
+
+        -- Reset spread gradually
+        task.delay(0.5, function()
+            spreadFactor = math.max(spreadFactor - 0.02, 0)
+        end)
+    end
+end
+
+-- Function to handle user input for aiming
+local function onInputBegan(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        print("Mouse clicked, aiming at enemy.")
+        aimAtTarget()
+    end
+end
+
+userInputService.InputBegan:Connect(onInputBegan)
+
+-- Function to manage player additions
+local function onPlayerAdded(player)
+    print("Player added: " .. player.Name)
+    detectAndAssignBot(player)
+    
+    player:GetPropertyChangedSignal("Team"):Connect(function()
+        createESP(player)
+    end)
+
+    player.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        createESP(player)
+    end)
+
+    createESP(player)
+end
+
+-- Apply to all current players
+for _, player in pairs(players:GetPlayers()) do
+    if player ~= localPlayer then
+        onPlayerAdded(player)
+    end
+end
+
+players.PlayerAdded:Connect(onPlayerAdded)
+players.PlayerRemoving:Connect(function(player)
+    print("Player removed: " .. player.Name)
+    botNames[player] = nil -- Remove bot name entry
+    if player.Character then
+        local highlight = player.Character:FindFirstChild("Highlight")
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+end)
+
+-- Check and create the line for all enemy players every frame
+runService.RenderStepped:Connect(function()
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Team ~= localPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            createLineAbove(player)
+        end
+    end
+end)
+
+-- Display health of enemies
+runService.RenderStepped:Connect(function()
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Team ~= localPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            local healthTag = player.Character.Head:FindFirstChild("HealthTag")
+            if not healthTag then
+                healthTag = Instance.new("BillboardGui")
+                healthTag.Name = "HealthTag"
+                healthTag.Size = UDim2.new(0, 50, 0, 25)
+                healthTag.StudsOffset = Vector3.new(0, 2.5, 0)
+                healthTag.Adornee = player.Character.Head
+                healthTag.Parent = player.Character.Head
+                healthTag.AlwaysOnTop = true
+                healthTag.MaxDistance = 10000
+
+                local textLabel = Instance.new("TextLabel", healthTag)
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.TextScaled = true
+                textLabel.TextColor3 = Color3.new(1, 0, 0)
+                textLabel.Font = Enum.Font.SourceSansBold
+                textLabel.Text = tostring(math.floor(player.Character.Humanoid.Health))
+            else
+                healthTag:FindFirstChild("TextLabel").Text = tostring(math.floor(player.Character.Humanoid.Health))
+            end
+        end
+    end
+end)
+
+-- Add tool glow effect
+while true do
+    task.wait(0.1)
+    if localPlayer.Character and localPlayer.Character:FindFirstChild("Tool") then
+        local tool = localPlayer.Character:FindFirstChild("Tool")
+        local highlight = tool:FindFirstChild("Highlight")
+        if not highlight then
+            highlight = Instance.new("Highlight")
+            highlight.Parent = tool
+            highlight.Adornee = tool
+            highlight.FillTransparency = 0.1
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        end
+        local hue = tick() % 1
+        highlight.FillColor = Color3.fromHSV(hue, 1, 1)
+        highlight.OutlineColor = Color3.fromHSV(hue, 1, 1)
+    end
+end
