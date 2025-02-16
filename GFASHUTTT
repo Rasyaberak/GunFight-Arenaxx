@@ -30,23 +30,24 @@ end
 
 -- Function to create ESP on enemies only
 local function createESP(player)
-    if not player or player == LocalPlayer or player.Team == LocalPlayer.Team then return end  -- Ignore teammates
+    if not player or player == LocalPlayer then return end  -- Ignore local player
+    if player.Team == LocalPlayer.Team then return end  -- Ignore teammates
 
     -- ESP Box and Line Drawing
     local Box = Drawing.new("Square")
     Box.Thickness = 2
-    Box.Color = Color3.fromRGB(255, 0, 0) -- Red Box for enemies
+    Box.Color = Color3.fromRGB(255, 0, 0) -- Red for enemies
     Box.Filled = false
     Box.Transparency = 1
 
     local Line = Drawing.new("Line")
     Line.Thickness = 2
-    Line.Color = Color3.fromRGB(255, 0, 0) -- Red Line for enemies
+    Line.Color = Color3.fromRGB(255, 0, 0) -- Red for enemies
     Line.Transparency = 1
 
-    -- Function to apply highlight (glow effect)
+    -- Function to apply enemy highlight (glow effect)
     local function applyHighlight()
-        if player.Character then
+        if player.Character and player.Team ~= LocalPlayer.Team then
             local highlight = player.Character:FindFirstChild("Highlight")
             if not highlight then
                 highlight = Instance.new("Highlight")
@@ -57,25 +58,21 @@ local function createESP(player)
                 highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             end
 
-            -- Only apply colored highlight to enemy team
-            if player.Team ~= LocalPlayer.Team then
-                local hue = 0
-                RunService.RenderStepped:Connect(function()
-                    if player and player.Character and highlight then
-                        hue = (hue + 10) % 360
-                        highlight.FillColor = Color3.fromHSV(hue / 360, 1, 1)
-                        highlight.OutlineColor = Color3.fromHSV(hue / 360, 1, 1)
-                    end
-                end)
-            else
-                highlight:Destroy() -- Remove highlight for teammates
-            end
+            -- Only apply to enemy team
+            local hue = 0
+            RunService.RenderStepped:Connect(function()
+                if player and player.Character and highlight then
+                    hue = (hue + 10) % 360
+                    highlight.FillColor = Color3.fromHSV(hue / 360, 1, 1)
+                    highlight.OutlineColor = Color3.fromHSV(hue / 360, 1, 1)
+                end
+            end)
         end
     end
 
     -- Function to update ESP Box and Line
     local function updateESP()
-        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        if not player.Character or player.Team == LocalPlayer.Team then
             Box.Visible = false
             Line.Visible = false
             return
@@ -218,7 +215,7 @@ end)
 
 -- Apply ESP to existing and new enemy players
 for _, player in pairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team then
+    if player.Team ~= LocalPlayer.Team then
         createESP(player)
     end
 end
