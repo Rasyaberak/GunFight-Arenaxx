@@ -28,22 +28,23 @@ local function detectAndAssignBot(player)
     end
 end
 
--- Function to create ESP on enemies
+-- Function to create ESP on enemies only
 local function createESP(player)
-    if not player or player == LocalPlayer or not player.Team then return end
+    if not player or player == LocalPlayer or player.Team == LocalPlayer.Team then return end  -- Ignore teammates
 
     -- ESP Box and Line Drawing
     local Box = Drawing.new("Square")
     Box.Thickness = 2
-    Box.Color = Color3.fromRGB(255, 0, 0) -- Red Box
+    Box.Color = Color3.fromRGB(255, 0, 0) -- Red Box for enemies
     Box.Filled = false
     Box.Transparency = 1
 
     local Line = Drawing.new("Line")
     Line.Thickness = 2
-    Line.Color = Color3.fromRGB(255, 0, 0) -- Red Line
+    Line.Color = Color3.fromRGB(255, 0, 0) -- Red Line for enemies
     Line.Transparency = 1
 
+    -- Function to apply highlight (glow effect)
     local function applyHighlight()
         if player.Character then
             local highlight = player.Character:FindFirstChild("Highlight")
@@ -56,6 +57,7 @@ local function createESP(player)
                 highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
             end
 
+            -- Only apply colored highlight to enemy team
             if player.Team ~= LocalPlayer.Team then
                 local hue = 0
                 RunService.RenderStepped:Connect(function()
@@ -66,12 +68,12 @@ local function createESP(player)
                     end
                 end)
             else
-                highlight.FillColor = Color3.new(1, 1, 1)
-                highlight.OutlineColor = Color3.new(1, 1, 1)
+                highlight:Destroy() -- Remove highlight for teammates
             end
         end
     end
 
+    -- Function to update ESP Box and Line
     local function updateESP()
         if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
             Box.Visible = false
@@ -88,7 +90,7 @@ local function createESP(player)
             local HeadPosition, OnScreen2 = Camera:WorldToViewportPoint(Head.Position)
 
             if OnScreen1 and OnScreen2 then
-                -- Adjust Box Size Based on Character
+                -- Calculate ESP Box Size
                 local BoxWidth = (Humanoid.HipHeight * 8) / RootPosition.Z
                 local BoxHeight = (Humanoid.HipHeight * 14) / RootPosition.Z
                 local BoxPosX = RootPosition.X - BoxWidth / 2
@@ -110,6 +112,7 @@ local function createESP(player)
         end
     end
 
+    -- Apply ESP only to enemies
     applyHighlight()
     RunService.RenderStepped:Connect(updateESP)
 
