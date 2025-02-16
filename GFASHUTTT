@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = game:GetService("Workspace").CurrentCamera
 local Lighting = game:GetService("Lighting")
+local Mouse = LocalPlayer:GetMouse()
 
 -- Optimize Lighting for FPS boost
 Lighting.GlobalShadows = false
@@ -12,12 +13,40 @@ Lighting.FogEnd = 100000
 Lighting.Brightness = 2
 Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
 
+local AimbotEnabled = true -- Aimbot always on
+local AimSmoothness = 0.2 -- Smoother aim transition
+local SpreadAmount = 1.5 -- Higher = more spread
+
 local ShootEvent = Instance.new("RemoteEvent")
 ShootEvent.Name = "ShootEvent"
 ShootEvent.Parent = ReplicatedStorage
 
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
+
+-- Function to get the closest enemy
+local function GetNearestEnemy()
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local char = player.Character
+            local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+            if head then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local distance = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestEnemy = head
+                    end
+                end
+            end
+        end
+    end
+    return closestEnemy
+end
 
 -- Function to detect bots and assign names
 local function detectAndAssignBot(player)
@@ -331,6 +360,44 @@ RunService.RenderStepped:Connect(function()
             
             healthBar.Size = UDim2.new(healthPercentage, 0, 1, 0)
             healthBar.BackgroundColor3 = Color3.fromRGB(255 * (1 - healthPercentage), 255 * healthPercentage, 0) 
+        end
+    end
+end)
+
+-- Aimbot function
+RunService.RenderStepped:Connect(function()
+    if AimbotEnabled then
+        local target = GetNearestEnemy()
+        if target then
+            -- Smooth Aim (Interpolates between current aim and target)
+            local targetPos = target.Position
+            local smoothPos = Camera.CFrame.Position:Lerp(targetPos, AimSmoothness)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, smoothPos)
+        end
+    end
+end)
+
+-- Bullet Spread
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local target = GetNearestEnemy()
+        if target then
+            -- Create random spread
+            local spread = Vector3.new(
+                math.random(-SpreadAmount, SpreadAmount) / 10,
+                math.random(-SpreadAmount, SpreadAmount) / 10,
+                math.random(-SpreadAmount, SpreadAmount) / 10
+            )
+            local shootDirection = (target.Position - Camera.CFrame.Position).unit + spread
+
+            -- Raycast to detect hits
+            local ray = Ray.new(Camera.CFrame.Position, shootDirection * 500)
+            local hit, position = workspace:FindPartOnRay(ray, LocalPlayer.Character)
+
+            if hit and hit.Parent:FindFirstChild("Humanoid") then
+                hit.Parent.Humanoid:TakeDamage(20) -- Deal 20 damage on hit
+            end
         end
     end
 end)
