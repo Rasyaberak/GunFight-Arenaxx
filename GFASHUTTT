@@ -241,6 +241,39 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ESP Loop
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and IsEnemy(player) then
+                local Character = player.Character
+                local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+
+                if HumanoidRootPart then
+                    local ScreenPosition, OnScreen = workspace.CurrentCamera:WorldToViewportPoint(HumanoidRootPart.Position)
+                    local MyScreenPos, MyOnScreen = workspace.CurrentCamera:WorldToViewportPoint(LocalPlayer.Character.HumanoidRootPart.Position)
+
+                    if not ESP_Lines[player] then
+                        ESP_Lines[player] = CreateESPLine()
+                    end
+
+                    local Line = ESP_Lines[player]
+                    if OnScreen and MyOnScreen then
+                        Line.Visible = true
+                        Line.From = Vector2.new(MyScreenPos.X, MyScreenPos.Y)
+                        Line.To = Vector2.new(ScreenPosition.X, ScreenPosition.Y)
+                    else
+                        Line.Visible = false
+                    end
+                end
+            elseif ESP_Lines[player] then
+                ESP_Lines[player].Visible = false
+            end
+        end
+    end
+end)
+
 -- Cleanup on player removal
 Players.PlayerRemoving:Connect(function(player)
     if ESP_Lines[player] then
@@ -249,22 +282,26 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
--- Add tool glow effect
-while true do
-    task.wait(0.1)
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Tool") then
-        local tool = LocalPlayer.Character:FindFirstChild("Tool")
-        local highlight = tool:FindFirstChild("Highlight")
-        if not highlight then
-            highlight = Instance.new("Highlight")
-            highlight.Parent = tool
-            highlight.Adornee = tool
-            highlight.FillTransparency = 0.1
-            highlight.OutlineTransparency = 0
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+-- Tool Glow Effect Loop
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if LocalPlayer.Character then
+            local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if tool then
+                local highlight = tool:FindFirstChild("Highlight")
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Parent = tool
+                    highlight.Adornee = tool
+                    highlight.FillTransparency = 0.1
+                    highlight.OutlineTransparency = 0
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                end
+                local hue = tick() % 1
+                highlight.FillColor = Color3.fromHSV(hue, 1, 1)
+                highlight.OutlineColor = Color3.fromHSV(hue, 1, 1)
+            end
         end
-        local hue = tick() % 1
-        highlight.FillColor = Color3.fromHSV(hue, 1, 1)
-        highlight.OutlineColor = Color3.fromHSV(hue, 1, 1)
     end
-end
+end)
