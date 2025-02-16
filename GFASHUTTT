@@ -32,6 +32,18 @@ end
 local function createESP(player)
     if not player or player == LocalPlayer or not player.Team then return end
 
+    -- ESP Box and Line Drawing
+    local Box = Drawing.new("Square")
+    Box.Thickness = 2
+    Box.Color = Color3.fromRGB(255, 0, 0) -- Red Box
+    Box.Filled = false
+    Box.Transparency = 1
+
+    local Line = Drawing.new("Line")
+    Line.Thickness = 2
+    Line.Color = Color3.fromRGB(255, 0, 0) -- Red Line
+    Line.Transparency = 1
+
     local function applyHighlight()
         if player.Character then
             local highlight = player.Character:FindFirstChild("Highlight")
@@ -60,18 +72,6 @@ local function createESP(player)
         end
     end
 
-    -- ESP Box and Line Drawing
-    local Box = Drawing.new("Square")
-    Box.Thickness = 2
-    Box.Color = Color3.fromRGB(255, 0, 0) -- Red Box
-    Box.Filled = false
-    Box.Transparency = 1
-
-    local Line = Drawing.new("Line")
-    Line.Thickness = 2
-    Line.Color = Color3.fromRGB(255, 0, 0) -- Red Line
-    Line.Transparency = 1
-
     local function updateESP()
         if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
             Box.Visible = false
@@ -81,15 +81,16 @@ local function createESP(player)
 
         local RootPart = player.Character:FindFirstChild("HumanoidRootPart")
         local Head = player.Character:FindFirstChild("Head")
+        local Humanoid = player.Character:FindFirstChild("Humanoid")
 
-        if RootPart and Head then
+        if RootPart and Head and Humanoid then
             local RootPosition, OnScreen1 = Camera:WorldToViewportPoint(RootPart.Position)
             local HeadPosition, OnScreen2 = Camera:WorldToViewportPoint(Head.Position)
 
             if OnScreen1 and OnScreen2 then
-                -- Calculate dynamic box size
-                local BoxWidth = 10000 / RootPosition.Z
-                local BoxHeight = 20000 / RootPosition.Z
+                -- Adjust Box Size Based on Character
+                local BoxWidth = (Humanoid.HipHeight * 8) / RootPosition.Z
+                local BoxHeight = (Humanoid.HipHeight * 14) / RootPosition.Z
                 local BoxPosX = RootPosition.X - BoxWidth / 2
                 local BoxPosY = RootPosition.Y - BoxHeight / 2
 
@@ -212,7 +213,7 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
--- Apply ESP to existing and new players
+-- Apply ESP to existing and new enemy players
 for _, player in pairs(Players:GetPlayers()) do
     if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team then
         createESP(player)
