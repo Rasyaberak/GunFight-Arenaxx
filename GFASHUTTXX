@@ -20,6 +20,7 @@ if not ShootEvent then
     ShootEvent.Parent = ReplicatedStorage
 end
 
+local RainbowSpeed = 5 -- Adjust speed of rainbow effect
 
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
@@ -96,6 +97,37 @@ local function createESP(player)
             end)
         end
     end
+    
+    local function createESP()
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                local highlight = Instance.new("Highlight")
+                highlight.Parent = part
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                highlight.OutlineColor = Color3.new(1, 0, 0) -- Default red, will change
+                highlight.FillTransparency = 1 -- Only outline visible
+                highlight.Adornee = part
+                highlight.Name = "ESPHighlight"
+                
+                -- Animate color
+                task.spawn(function()
+                    local t = 0
+                    while highlight.Parent and ESPEnabled do
+                        highlight.OutlineColor = Color3.fromHSV(math.abs(math.sin(t * RainbowSpeed)), 1, 1)
+                        t = t + RunService.RenderStepped:Wait()
+                    end
+                    if not ESPEnabled then
+                        highlight:Destroy()
+                    end
+                end)
+            end
+        end
+    end
+end
+
+createESP()
 
     -- Function to update ESP Box and Line
     local function updateESP()
