@@ -12,9 +12,14 @@ Lighting.FogEnd = 100000
 Lighting.Brightness = 2
 Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
 
-local ShootEvent = Instance.new("RemoteEvent")
-ShootEvent.Name = "ShootEvent"
-ShootEvent.Parent = ReplicatedStorage
+-- Create (or get) the RemoteEvent for shooting
+local ShootEvent = ReplicatedStorage:FindFirstChild("ShootEvent")
+if not ShootEvent then
+    ShootEvent = Instance.new("RemoteEvent")
+    ShootEvent.Name = "ShootEvent"
+    ShootEvent.Parent = ReplicatedStorage
+end
+
 
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
@@ -199,13 +204,6 @@ end
 
 UserInputService.InputBegan:Connect(onInputBegan)
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-
-local ShootEvent = Instance.new("RemoteEvent")
-ShootEvent.Name = "ShootEvent"
-ShootEvent.Parent = ReplicatedStorage
-
 local function findClosestEnemy(shooter)
     local closestEnemy = nil
     local shortestDistance = math.huge
@@ -335,12 +333,84 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-ShootEvent.OnServerEvent:Connect(function(player, origin, direction)
-    local target = findClosestEnemy(player)
-    if target then
-        shootAtTarget(player, target)
+if RunService:IsServer() then
+    -- SERVER CODE: This runs on Roblox’s server.
+    ShootEvent.OnServerEvent:Connect(function(player, origin, direction, weaponData)
+        -- Validate the shooting parameters.
+        if typeof(origin) ~= "Vector3" or typeof(direction) ~= "Vector3" or typeof(weaponData) ~= "table" then
+            warn("Invalid shooting parameters from " .. player.Name)
+            return
+        end
+
+        -- Set up raycast parameters to ignore the shooter’s character.
+        local raycastParams = RaycastParams.new()
+        if player.Character then
+            raycastParams.FilterDescendantsInstances = {player.Character}
+        end
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.IgnoreWater = true
+
+        -- Determine the shot’s range (default is 500 studs).
+        local range = weaponData.range or 500
+        local rayDirection = direction.Unit * range
+
+        -- Perform the raycast.
+        local result = workspace:Raycast(origin, rayDirection, raycastParams)
+        if result then
+            local hitPart = result.Instance
+            local hitCharacter = hitPart:FindFirstAncestorWhichIsA("Model")
+            if hitCharacter then
+                local humanoid = hitCharacter:FindFirstChild("Humanoid")
+                if humanoid and humanoid.Health > 0 then
+                    local damage = weaponData.damage or 25
+
+                    -- Optional: Double damage if it’s a headshot.
+                    if hitPart.Name == "Head" then
+                        damage = damage * 2
+                    end
+
+                    humanoid:TakeDamage(damage)
+                    print(player.Name .. " hit " .. hitCharacter.Name .. " for " .. damage .. " damage.")
+                end
+            end
+        end
+    end)
+
+elseif RunService:IsClient() then
+    -- CLIENT CODE: This runs on the player's device (PC or mobile).
+    local player = Players.LocalPlayer
+    local camera = workspace.CurrentCamera
+
+    -- Define the weapon's data.
+    local weaponData = {
+        damage = 25,
+        range = 500,
+    }
+
+    -- Function to fire a shot using a screen position.
+    local function fireShot(screenPos)
+        if not player.Character or not player.Character:FindFirstChild("Head") then
+            return
+        end
+
+        local origin = player.Character.Head.Position
+        -- Convert the screen position to a ray from the camera.
+        local ray = camera:ScreenPointToRay(screenPos.X, screenPos.Y)
+        local direction = ray.Direction
+
+        -- Fire the remote event to the server.
+        ShootEvent:FireServer(origin, direction, weaponData)
     end
-end)
+
+    -- Listen for both Mouse and Touch input.
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            fireShot(input.Position)
+        end
+    end)
+end
 
 -- Tool Glow Effect Loop
 task.spawn(function()
