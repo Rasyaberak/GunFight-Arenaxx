@@ -1,3 +1,8 @@
+r3.fromHSV(hue, 1, 1)
+            end
+        end
+    end
+end)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -5,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = game:GetService("Workspace").CurrentCamera
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 -- Optimize Lighting for FPS boost
 Lighting.GlobalShadows = false
@@ -25,6 +31,38 @@ local RainbowSpeed = 5 -- Adjust speed of rainbow effect
 local spreadFactor = 0 -- Recoil spread factor
 local botNames = {} -- Store bot names
 
+local player = Players.LocalPlayer
+local tool = script.Parent
+local remoteEvent = ReplicatedStorage:WaitForChild("ShotEvent")
+local gunSound = tool.Handle:WaitForChild("Gun Shot")
+
+local shooting = false
+local fireRate = 0.05 -- seconds between shots; lower value means faster firing
+
+-- Function to get aim position (for PC, using mouse; for mobile you might use camera direction or a custom GUI button)
+local function getAimPosition()
+    local mouse = player:GetMouse()
+    return mouse.Hit.p  -- Adjust this if you use a different aiming method on mobile
+end
+
+-- Function that handles continuous firing
+local function startShooting()
+    if shooting then return end
+    shooting = true
+    spawn(function()
+        while shooting do
+            local aimPos = getAimPosition()
+            remoteEvent:FireServer(tool, tool.Handle.Position, aimPos)
+            gunSound:Play()
+            wait(fireRate)
+        end
+    end)
+end
+
+local function stopShooting()
+    shooting = false
+end
+
 -- Function to detect bots and assign names
 local function detectAndAssignBot(player)
     if not player then return end
@@ -37,6 +75,18 @@ local function detectAndAssignBot(player)
         botNames[player] = "AI-" .. tostring(math.random(1000, 9999))
         print("Detected bot: " .. botNames[player])
     end
+end
+
+local recoilIntensity = 5  -- degrees of upward recoil
+local recoilTime = 0.1     -- time taken for recoil to apply
+
+local function applyRecoil()
+    local cam = workspace.CurrentCamera
+    local recoilOffset = CFrame.Angles(math.rad(-recoilIntensity), 0, 0)
+    local tweenInfo = TweenInfo.new(recoilTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(cam, tweenInfo, {CFrame = cam.CFrame * recoilOffset})
+    tween:Play()
+    -- You could then tween the camera back to normal for recovery
 end
 
 local function findClosestEnemy(shooter)
@@ -443,6 +493,50 @@ elseif RunService:IsClient() then
         end
     end)
 end
+
+-- Setup input events when the tool is equipped
+tool.Equipped:Connect(function(mouse)
+    -- PC support using mouse events:
+    if not UserInputService.TouchEnabled then
+        mouse.Button1Down:Connect(startShooting)
+        mouse.Button1Up:Connect(stopShooting)
+    else
+        -- Mobile support: use InputBegan/Ended to detect touch
+        local inputBeganConn, inputEndedConn
+        inputBeganConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.UserInputType == Enum.UserInputType.Touch then
+                startShooting()
+            end
+        end)
+        inputEndedConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                stopShooting()
+            end
+        end)
+        tool.Unequipped:Connect(function()
+            inputBeganConn:Disconnect()
+            inputEndedConn:Disconnect()
+        end)
+    end
+end)
+
+tool.Unequipped:Connect(function()
+    stopShooting()
+end)
+
+local reloadDelay = 1  -- set to a lower value for faster reload
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.R then
+        -- play reload animation/sound
+        reloadSound:Play()
+        wait(reloadDelay)
+        gun.Ammo.Value = clipSize  -- reset ammo count
+    end
+end)
+
 
 -- Tool Glow Effect Loop
 task.spawn(function()
